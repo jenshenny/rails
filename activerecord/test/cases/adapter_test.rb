@@ -14,6 +14,56 @@ module ActiveRecord
       @connection.materialize_transactions
     end
 
+    unless current_adapter?(:SQLite3Adapter)
+      test "connect on db error" do
+        db_config = ActiveRecord::Base.configurations.configs_for(env_name: "arunit", name: "primary")
+        assert_raises ActiveRecord::NoDatabaseError do
+          case @connection.class::ADAPTER_NAME
+          when "PostgreSQL"
+            ActiveRecord::Base.postgresql_connection(db_config.configuration_hash.merge(database: "unknown")).connect!
+          when "Mysql2"
+            ActiveRecord::Base.mysql2_connection(db_config.configuration_hash.merge(database: "unknown")).connect!
+          when "Trilogy"
+            ActiveRecord::Base.trilogy_connection(db_config.configuration_hash.merge(database: "unknown")).connect!
+          end
+        end
+      end
+
+      test "connect on access denied error" do
+        db_config = ActiveRecord::Base.configurations.configs_for(env_name: "arunit", name: "primary")
+        assert_raises ActiveRecord::DatabaseConnectionError do
+          case @connection.class::ADAPTER_NAME
+          when "PostgreSQL"
+            ActiveRecord::Base.postgresql_connection(db_config.configuration_hash.merge(user: "unknown")).connect!
+          when "Mysql2"
+            ActiveRecord::Base.mysql2_connection(db_config.configuration_hash.merge(username: "unknown")).connect!
+          when "Trilogy"
+            # This gets raised as a <Trilogy::QueryError: trilogy_auth_recv: TRILOGY_PROTOCOL_VIOLATION> exception
+            # Needs to be fixed upstream in the Trilogy Ruby driver
+            ActiveRecord::Base.trilogy_connection(db_config.configuration_hash.merge(username: "unknown")).connect!
+          end
+        end
+      end
+
+      test "connect on host error" do
+        # assert_raises ActiveRecord::DatabaseConnectionError do
+        #   @connection.class.new_client(host: "unknown")
+        # end
+
+        db_config = ActiveRecord::Base.configurations.configs_for(env_name: "arunit", name: "primary")
+        assert_raises ActiveRecord::DatabaseConnectionError do
+          case @connection.class::ADAPTER_NAME
+          when "PostgreSQL"
+            ActiveRecord::Base.postgresql_connection(db_config.configuration_hash.merge(host: "unknown")).connect!
+          when "Mysql2"
+            ActiveRecord::Base.mysql2_connection(db_config.configuration_hash.merge(host: "unknown")).connect!
+          when "Trilogy"
+            ActiveRecord::Base.trilogy_connection(db_config.configuration_hash.merge(host: "unknown")).connect!
+          end
+        end
+      end
+    end
+
     ##
     # PostgreSQL does not support null bytes in strings
     unless current_adapter?(:PostgreSQLAdapter) ||
